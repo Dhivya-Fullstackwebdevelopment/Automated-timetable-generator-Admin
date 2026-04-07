@@ -1,162 +1,275 @@
-import { useState } from "react";
-import { useAppState } from "@/context/AppContext";
-import type { StaffStatus, ShiftAvailability } from "@/types/timetable";
+import { useEffect, useState } from "react";
 import { User, Trash2, Plus, Edit } from "lucide-react";
+import {
+    getStaff,
+    addStaffApi,
+    updateStaffApi,
+    deleteStaffApi,
+} from "@/api/staffApi";
+import { getDepartments } from "@/api/departmentApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/Reusable/DeletePopup";
+import z from "zod";
+
+type Dept = {
+    id: number;
+    name: string;
+};
+
+type Staff = {
+    id: number;
+    name: string;
+    subjects: string;
+    status: string;
+    department: number;
+    department_name: string;
+};
+
+const staffSchema = z.object({
+    name: z.string().min(2, "Name is required"),
+    department: z.number(),
+    subjects: z.string().min(2, "Subjects is required"),
+    status: z.enum(["ACTIVE", "SICK", "RESIGNED"]),
+});
 
 export function StaffManager() {
-  const { staff, departments, addStaff, updateStaff, deleteStaff } = useAppState();
-  const [name, setName] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
-  const [subjectsStr, setSubjectsStr] = useState("");
-  const [shift, setShift] = useState<ShiftAvailability>("Both");
-  const [editingStaff, setEditingStaff] = useState<string | null>(null);
-  const [editStatus, setEditStatus] = useState<StaffStatus>("Active");
-  const [filterDept, setFilterDept] = useState<string>("all");
+    const [departments, setDepartments] = useState<Dept[]>([]);
+    const [staff, setStaff] = useState<Staff[]>([]);
+    const [name, setName] = useState("");
+    const [departmentId, setDepartmentId] = useState("");
+    const [subjectsStr, setSubjectsStr] = useState("");
+    const [status, setStatus] = useState("ACTIVE");
+    const [editId, setEditId] = useState<number | null>(null);
+    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<{ name?: string }>({});
 
-  const handleAdd = () => {
-    if (!name.trim() || !departmentId || !subjectsStr.trim()) return;
-    addStaff({
-      name: name.trim(),
-      departmentId,
-      subjects: subjectsStr.split(",").map(s => s.trim()).filter(Boolean),
-      status: "Active",
-      availableShift: shift,
-    });
-    setName("");
-    setSubjectsStr("");
-  };
+    const resetForm = () => {
+        setName("");
+        setDepartmentId("");
+        setSubjectsStr("");
+        setStatus("ACTIVE");
+        setEditId(3);
+        setErrors({});
+    };
 
-  const handleStatusChange = (staffId: string, status: StaffStatus) => {
-    const s = staff.find(x => x.id === staffId);
-    if (s) updateStaff({ ...s, status });
-    setEditingStaff(null);
-  };
+    const fetchDepartments = async () => {
+        const res = await getDepartments();
+        setDepartments(res.data.data);
+    };
 
-  const statusClass = (status: StaffStatus) => {
-    switch (status) {
-      case "Active": return "status-active";
-      case "Sick Leave":
-      case "Emergency Leave": return "status-leave";
-      case "Resigned": return "status-resigned";
-    }
-  };
+    const fetchStaff = async () => {
+        const res = await getStaff();
+        setStaff(res.data.data);
+    };
 
-  const filtered = filterDept === "all" ? staff : staff.filter(s => s.departmentId === filterDept);
+    useEffect(() => {
+        fetchDepartments();
+        fetchStaff();
+    }, []);
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold font-display">Staff Management</h2>
-        <p className="text-muted-foreground mt-1">Add staff, manage leave and resignations</p>
-      </div>
+    const handleSubmit = async () => {
+        const payload = {
+            name,
+            department: Number(departmentId),
+            subjects: subjectsStr,
+            status,
+        };
 
-      <div className="card-elevated p-6">
-        <h3 className="font-semibold font-display mb-4">Add New Staff</h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Input placeholder="Staff name" value={name} onChange={e => setName(e.target.value)} />
-          <Select value={departmentId} onValueChange={setDepartmentId}>
-            <SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger>
-            <SelectContent>
-              {departments.map(d => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input placeholder="Subjects (comma sep)" value={subjectsStr} onChange={e => setSubjectsStr(e.target.value)} />
-          <Select value={shift} onValueChange={v => setShift(v as ShiftAvailability)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Odd">Odd Semester</SelectItem>
-              <SelectItem value="Even">Even Semester</SelectItem>
-              <SelectItem value="Both">Both</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button onClick={handleAdd} className="mt-3">
-          <Plus className="w-4 h-4 mr-1" /> Add Staff
-        </Button>
-      </div>
+        const result = staffSchema.safeParse(payload);
 
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Filter:</span>
-        <Select value={filterDept} onValueChange={setFilterDept}>
-          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
-            {departments.map(d => (
-              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        if (!result.success) {
+            const err = result.error.flatten().fieldErrors;
+            setErrors({ name: err.name?.[0] });
+            toast.error(err.name?.[0] || "Validation error ❌");
+            return;
+        }
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map(s => {
-          const dept = departments.find(d => d.id === s.departmentId);
-          return (
-            <div key={s.id} className="card-hover p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold font-display">{s.name}</p>
-                    <p className="text-xs text-muted-foreground">{dept?.name}</p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" onClick={() => { setEditingStaff(s.id); setEditStatus(s.status); }}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Update Status - {s.name}</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <Select value={editStatus} onValueChange={v => setEditStatus(v as StaffStatus)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Active">Active</SelectItem>
-                            <SelectItem value="Sick Leave">Sick Leave</SelectItem>
-                            <SelectItem value="Emergency Leave">Emergency Leave</SelectItem>
-                            <SelectItem value="Resigned">Resigned</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button onClick={() => handleStatusChange(s.id, editStatus)} className="w-full">
-                          Update Status
+        try {
+            setLoading(true);
+
+            if (editId) {
+                await updateStaffApi(editId, payload);
+                toast.success("Staff Updated Successfully ✅");
+            } else {
+                await addStaffApi(payload);
+                toast.success("Staff Added Successfully ✅");
+            }
+
+            resetForm();
+            fetchStaff();
+        } catch {
+            toast.error("API Error ❌");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (s: Staff) => {
+        setName(s.name);
+        setDepartmentId(String(s.department));
+        setSubjectsStr(s.subjects);
+        setStatus(s.status);
+        setEditId(s.id);
+    };
+
+    const handleDelete = async () => {
+        if (!deleteId) return;
+
+        try {
+            setLoading(true);
+            await deleteStaffApi(deleteId);
+            toast.success("Staff Deleted Successfully 🗑️");
+
+            setDeleteId(null);
+            fetchStaff();
+        } catch {
+            toast.error("Delete failed ❌");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold">Staff Management</h2>
+
+            {/* FORM */}
+            <div className="card-elevated p-6">
+                <h3 className="font-semibold mb-4">
+                    {editId ? "Update Staff" : "Add Staff"}
+                </h3>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div>
+                        <Input
+                            placeholder="Staff name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                        />
+                        {errors.name && (
+                            <p className="text-red-500 text-sm">{errors.name}</p>
+                        )}
+                    </div>
+
+                    {/* DEPARTMENT */}
+                    <Select value={departmentId} onValueChange={setDepartmentId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {departments.map((d) => (
+                                <SelectItem key={d.id} value={String(d.id)}>
+                                    {d.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* SUBJECTS */}
+                    <Input
+                        placeholder="Subjects"
+                        value={subjectsStr}
+                        onChange={(e) => setSubjectsStr(e.target.value)}
+                    />
+
+                    {/* STATUS */}
+                    <Select value={status} onValueChange={setStatus}>
+                        <SelectTrigger>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ACTIVE">Active</SelectItem>
+                            <SelectItem value="SICK">Sick</SelectItem>
+                            <SelectItem value="EMERGENCY">Emergency Leave</SelectItem>
+                            <SelectItem value="RESIGNED">Resigned</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <Button onClick={handleSubmit} disabled={loading}>
+                        <Plus className="w-4 h-4 mr-1" />
+                        {loading
+                            ? "Processing..."
+                            : editId
+                                ? "Update"
+                                : "Add"}
+                    </Button>
+                    {editId && (
+                        <Button
+                            variant="outline"
+                            onClick={resetForm}
+                        >
+                            Cancel
                         </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  <Button variant="ghost" size="icon" onClick={() => deleteStaff(s.id)}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                    )}
                 </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {s.subjects.map(sub => (
-                  <Badge key={sub} variant="secondary" className="text-xs">{sub}</Badge>
-                ))}
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${statusClass(s.status)}`}>
-                  {s.status}
-                </span>
-                <span className="text-xs text-muted-foreground">Shift: {s.availableShift}</span>
-              </div>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+
+            {/* LIST */}
+            {loading && <p className="text-sm">Loading...</p>}
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {staff.map((s) => (
+                    <div key={s.id} className="card-hover p-4">
+                        <div className="flex justify-between">
+                            <div className="flex gap-3">
+                                <User />
+                                <div>
+                                    <p className="font-semibold">{s.name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {s.department_name}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => handleEdit(s)}
+                                >
+                                    <Edit className="w-4 h-4 text-blue-500" />
+                                </Button>
+
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setDeleteId(s.id)}
+                                >
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="mt-2 text-sm">
+                            <strong>Subjects:</strong> {s.subjects}
+                        </div>
+
+                        <div className="mt-2">
+                            <span className="text-xs px-2 py-1 rounded bg-secondary">
+                                {s.status}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* DELETE POPUP */}
+            <ConfirmDialog
+                open={!!deleteId}
+                onClose={() => setDeleteId(null)}
+                onConfirm={handleDelete}
+                title="Are you sure you want to delete?"
+            />
+        </div>
+    );
 }
