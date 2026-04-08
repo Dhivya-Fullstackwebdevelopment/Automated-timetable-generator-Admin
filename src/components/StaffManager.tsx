@@ -45,20 +45,20 @@ export function StaffManager() {
     const [departments, setDepartments] = useState<Dept[]>([]);
     const [staff, setStaff] = useState<Staff[]>([]);
     const [name, setName] = useState("");
-    const [departmentId, setDepartmentId] = useState("");
+    const [departmentId, setDepartmentId] = useState("3");
     const [subjectsStr, setSubjectsStr] = useState("");
     const [status, setStatus] = useState("ACTIVE");
     const [editId, setEditId] = useState<number | null>(null);
     const [deleteId, setDeleteId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState<{ name?: string }>({});
+    const [errors, setErrors] = useState<{ name?: string; subjects?: string }>({});
 
     const resetForm = () => {
         setName("");
-        setDepartmentId("");
         setSubjectsStr("");
         setStatus("ACTIVE");
-        setEditId(3);
+        setEditId(null); 
+        setDepartmentId("3");
         setErrors({});
     };
 
@@ -89,7 +89,10 @@ export function StaffManager() {
 
         if (!result.success) {
             const err = result.error.flatten().fieldErrors;
-            setErrors({ name: err.name?.[0] });
+            setErrors({
+                name: err.name?.[0],
+                subjects: err.subjects?.[0],
+            });
             toast.error(err.name?.[0] || "Validation error ❌");
             return;
         }
@@ -149,13 +152,15 @@ export function StaffManager() {
                     {editId ? "Update Staff" : "Add Staff"}
                 </h3>
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                     <div>
                         <Input
                             placeholder="Staff name"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
-                        />
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                setErrors((prev) => ({ ...prev, name: undefined }));
+                            }} />
                         {errors.name && (
                             <p className="text-red-500 text-sm">{errors.name}</p>
                         )}
@@ -176,11 +181,21 @@ export function StaffManager() {
                     </Select>
 
                     {/* SUBJECTS */}
-                    <Input
-                        placeholder="Subjects"
-                        value={subjectsStr}
-                        onChange={(e) => setSubjectsStr(e.target.value)}
-                    />
+                    <div>
+                        <Input
+                            placeholder="Subjects"
+                            value={subjectsStr}
+                            onChange={(e) => {
+                                setSubjectsStr(e.target.value);
+                                setErrors((prev) => ({ ...prev, subjects: undefined }));
+                            }}
+                        />
+
+                        {errors.subjects && (
+                            <p className="text-red-500 text-sm">{errors.subjects}</p>
+                        )}
+                    </div>
+
 
                     {/* STATUS */}
                     <Select value={status} onValueChange={setStatus}>

@@ -12,7 +12,6 @@ import {
   updateDepartmentApi,
   deleteDepartmentApi,
 } from "@/api/departmentApi";
-import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
