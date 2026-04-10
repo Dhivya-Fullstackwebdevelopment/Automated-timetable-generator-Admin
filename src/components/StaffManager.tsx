@@ -19,6 +19,8 @@ import {
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/Reusable/DeletePopup";
 import z from "zod";
+import axios from "axios";
+import { BASE_URL } from "@/api/apiurl";
 
 type Dept = {
     id: number;
@@ -56,9 +58,12 @@ export function StaffManager() {
         name: "",
         department: "",
         status: "",
-        subjects: "",
+        subjects: [] as string[],
+
     });
     const formRef = useRef<HTMLDivElement | null>(null);
+    const [subjects, setSubjects] = useState<any[]>([]);
+    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
     const filteredStaff = staff.filter((s) => {
         return (
@@ -70,8 +75,12 @@ export function StaffManager() {
 
             (!filters.status || s.status === filters.status) &&
 
-            (!filters.subjects ||
-                s.subjects.toLowerCase().includes(filters.subjects.toLowerCase()))
+            (
+                filters.subjects.length === 0 ||
+                filters.subjects.some((sub) =>
+                    s.subjects.toLowerCase().includes(sub.toLowerCase())
+                )
+            )
         );
     });
 
@@ -94,16 +103,30 @@ export function StaffManager() {
         setStaff(res.data.data);
     };
 
+    const fetchSubjects = async () => {
+        try {
+            const res = await axios.get(
+                `${BASE_URL}/api/subject/list/`
+            );
+
+            setSubjects(res.data.data);
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to fetch subjects ❌");
+        }
+    };
+
     useEffect(() => {
         fetchDepartments();
         fetchStaff();
+        fetchSubjects()
     }, []);
 
     const handleSubmit = async () => {
         const payload = {
             name,
             department: Number(departmentId),
-            subjects: subjectsStr,
+            subjects: selectedSubjects.join(", "),
             status,
         };
 
@@ -142,7 +165,7 @@ export function StaffManager() {
     const handleEdit = (s: Staff) => {
         setName(s.name);
         setDepartmentId(String(s.department));
-        setSubjectsStr(s.subjects);
+        setSelectedSubjects(s.subjects.split(",").map((x) => x.trim()));
         setStatus(s.status);
         setEditId(s.id);
         setTimeout(() => {
@@ -210,20 +233,41 @@ export function StaffManager() {
 
                     {/* SUBJECTS */}
                     <div>
-                        <Input
-                            placeholder="Subjects"
-                            value={subjectsStr}
-                            onChange={(e) => {
-                                setSubjectsStr(e.target.value);
-                                setErrors((prev) => ({ ...prev, subjects: undefined }));
+                        <Select
+                            onValueChange={(value) => {
+                                if (!selectedSubjects.includes(value)) {
+                                    setSelectedSubjects([...selectedSubjects, value]);
+                                }
                             }}
-                        />
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Subjects" />
+                            </SelectTrigger>
 
-                        {errors.subjects && (
-                            <p className="text-red-500 text-sm">{errors.subjects}</p>
-                        )}
+                            <SelectContent>
+                                {subjects.map((sub) => (
+                                    <SelectItem key={sub.id} value={sub.name}>
+                                        {sub.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Selected Subjects */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {selectedSubjects.map((sub, i) => (
+                                <span
+                                    key={i}
+                                    className="px-2 py-1 text-xs bg-blue-100 rounded cursor-pointer"
+                                    onClick={() =>
+                                        setSelectedSubjects(selectedSubjects.filter((s) => s !== sub))
+                                    }
+                                >
+                                    {sub} ❌
+                                </span>
+                            ))}
+                        </div>
                     </div>
-
 
                     {/* STATUS */}
                     <Select value={status} onValueChange={setStatus}>
@@ -308,13 +352,48 @@ export function StaffManager() {
                     </Select>
 
                     {/* Subjects */}
-                    <Input
-                        placeholder="Search subjects"
-                        value={filters.subjects}
-                        onChange={(e) =>
-                            setFilters({ ...filters, subjects: e.target.value })
-                        }
-                    />
+                    <div>
+                        <Select
+                            onValueChange={(value) => {
+                                if (!filters.subjects.includes(value)) {
+                                    setFilters({
+                                        ...filters,
+                                        subjects: [...filters.subjects, value],
+                                    });
+                                }
+                            }}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Filter Subjects" />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                                {subjects.map((sub) => (
+                                    <SelectItem key={sub.id} value={sub.name}>
+                                        {sub.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Selected filter chips */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {filters.subjects.map((sub, i) => (
+                                <span
+                                    key={i}
+                                    className="px-2 py-1 text-xs bg-green-100 rounded cursor-pointer"
+                                    onClick={() =>
+                                        setFilters({
+                                            ...filters,
+                                            subjects: filters.subjects.filter((s) => s !== sub),
+                                        })
+                                    }
+                                >
+                                    {sub} ❌
+                                </span>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Clear */}
@@ -326,7 +405,7 @@ export function StaffManager() {
                             name: "",
                             department: "",
                             status: "",
-                            subjects: "",
+                            subjects: [],
                         })
                     }
                 >
