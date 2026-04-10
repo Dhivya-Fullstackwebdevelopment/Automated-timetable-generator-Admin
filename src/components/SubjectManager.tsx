@@ -86,6 +86,22 @@ export function SubjectManager() {
     fetchDepartments();
   }, []);
 
+  useEffect(() => {
+    let hours = 4;
+
+    if (isSchoolClass) {
+      hours = 6;
+    } else if (isLab) {
+      hours = 2;
+    } else if (semester === "ODD") {
+      hours = 5;
+    } else {
+      hours = 4;
+    }
+
+    setWeeklyHours(String(hours));
+  }, [isLab, isSchoolClass, semester]);
+
   // RESET
   const resetForm = () => {
     setName("");
