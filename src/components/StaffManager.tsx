@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { User, Trash2, Plus, Edit } from "lucide-react";
 import {
     getStaff,
@@ -52,12 +52,34 @@ export function StaffManager() {
     const [deleteId, setDeleteId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ name?: string; subjects?: string }>({});
+    const [filters, setFilters] = useState({
+        name: "",
+        department: "",
+        status: "",
+        subjects: "",
+    });
+    const formRef = useRef<HTMLDivElement | null>(null);
+
+    const filteredStaff = staff.filter((s) => {
+        return (
+            (!filters.name ||
+                s.name.toLowerCase().includes(filters.name.toLowerCase())) &&
+
+            (!filters.department ||
+                String(s.department) === filters.department) &&
+
+            (!filters.status || s.status === filters.status) &&
+
+            (!filters.subjects ||
+                s.subjects.toLowerCase().includes(filters.subjects.toLowerCase()))
+        );
+    });
 
     const resetForm = () => {
         setName("");
         setSubjectsStr("");
         setStatus("ACTIVE");
-        setEditId(null); 
+        setEditId(null);
         setDepartmentId("3");
         setErrors({});
     };
@@ -123,6 +145,12 @@ export function StaffManager() {
         setSubjectsStr(s.subjects);
         setStatus(s.status);
         setEditId(s.id);
+        setTimeout(() => {
+            formRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        }, 100);
     };
 
     const handleDelete = async () => {
@@ -147,7 +175,7 @@ export function StaffManager() {
             <h2 className="text-2xl font-bold">Staff Management</h2>
 
             {/* FORM */}
-            <div className="card-elevated p-6">
+            <div ref={formRef} className="card-elevated p-6">
                 <h3 className="font-semibold mb-4">
                     {editId ? "Update Staff" : "Add Staff"}
                 </h3>
@@ -228,12 +256,89 @@ export function StaffManager() {
                     )}
                 </div>
             </div>
+            <div className="card-elevated p-4">
+                <h3 className="font-semibold mb-3">Filter Staff</h3>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+                    {/* Name */}
+                    <Input
+                        placeholder="Search name"
+                        value={filters.name}
+                        onChange={(e) =>
+                            setFilters({ ...filters, name: e.target.value })
+                        }
+                    />
+
+                    {/* Department */}
+                    <Select
+                        value={filters.department}
+                        onValueChange={(v) =>
+                            setFilters({ ...filters, department: v })
+                        }
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {departments.map((d) => (
+                                <SelectItem key={d.id} value={String(d.id)}>
+                                    {d.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Status */}
+                    <Select
+                        value={filters.status}
+                        onValueChange={(v) =>
+                            setFilters({ ...filters, status: v })
+                        }
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ACTIVE">Active</SelectItem>
+                            <SelectItem value="SICK">Sick</SelectItem>
+                            <SelectItem value="EMERGENCY">Emergency</SelectItem>
+                            <SelectItem value="RESIGNED">Resigned</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    {/* Subjects */}
+                    <Input
+                        placeholder="Search subjects"
+                        value={filters.subjects}
+                        onChange={(e) =>
+                            setFilters({ ...filters, subjects: e.target.value })
+                        }
+                    />
+                </div>
+
+                {/* Clear */}
+                <Button
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() =>
+                        setFilters({
+                            name: "",
+                            department: "",
+                            status: "",
+                            subjects: "",
+                        })
+                    }
+                >
+                    Clear Filters
+                </Button>
+            </div>
 
             {/* LIST */}
             {loading && <p className="text-sm">Loading...</p>}
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {staff.map((s) => (
+                {filteredStaff.map((s) => (
                     <div key={s.id} className="card-hover p-4">
                         <div className="flex justify-between">
                             <div className="flex gap-3">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, Trash2, Plus, Pencil } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -51,8 +51,25 @@ export function SubjectManager() {
   const selectedDept = departments.find(
     (d) => String(d.id) === departmentId
   );
-
+  const [filters, setFilters] = useState({
+    name: "",
+    department: "",
+    semester: "",
+    year: "",
+    isLab: false,
+  });
   const isSchoolClass = selectedDept?.type === 1;
+  const formRef = useRef<HTMLDivElement | null>(null);
+
+  const filteredSubjects = subjects.filter((s) => {
+    return (
+      (!filters.name || s.name.toLowerCase().includes(filters.name.toLowerCase())) &&
+      (!filters.department || String(s.department) === filters.department) &&
+      (!filters.semester || s.semester === filters.semester) &&
+      (!filters.year || String(s.year) === filters.year) &&
+      (!filters.isLab || s.is_lab === true)
+    );
+  });
 
   const fetchSubjects = async () => {
     const res = await getSubjects();
@@ -91,7 +108,7 @@ export function SubjectManager() {
       year: isSchoolClass ? 0 : Number(year),
       is_lab: isSchoolClass ? false : isLab,
     };
-    
+
     let newErrors: any = {};
 
     if (!name) newErrors.name = "Subject name is required";
@@ -143,6 +160,12 @@ export function SubjectManager() {
     setYear(String(s.year));
     setIsLab(s.is_lab);
     setEditId(s.id);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
   };
 
   // DELETE
@@ -163,9 +186,8 @@ export function SubjectManager() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Subject Management</h2>
-
       {/* FORM */}
-      <div className="card-elevated p-6">
+      <div ref={formRef} className="card-elevated p-6">
         <h3 className="font-semibold mb-4">
           {editId ? "Update Subject" : "Add Subject"}
         </h3>
@@ -298,10 +320,97 @@ export function SubjectManager() {
           )}
         </div>
       </div>
+      <div className="card-elevated p-4">
+        <h3 className="font-semibold mb-3">Filter Subjects</h3>
 
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+          {/* Subject Name */}
+          <Input
+            placeholder="Subject name"
+            value={filters.name}
+            onChange={(e) =>
+              setFilters({ ...filters, name: e.target.value })
+            }
+          />
+
+          {/* Department */}
+          <Select
+            value={filters.department}
+            onValueChange={(v) =>
+              setFilters({ ...filters, department: v })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              {departments.map((d) => (
+                <SelectItem key={d.id} value={String(d.id)}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Semester */}
+          <Select
+            value={filters.semester}
+            onValueChange={(v) =>
+              setFilters({ ...filters, semester: v })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Odd / Even" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ODD">Odd</SelectItem>
+              <SelectItem value="EVEN">Even</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Year */}
+          <Input
+            type="number"
+            placeholder="Year"
+            value={filters.year}
+            onChange={(e) =>
+              setFilters({ ...filters, year: e.target.value })
+            }
+          />
+        </div>
+
+        {/* Lab Toggle */}
+        <div className="flex items-center gap-2 mt-3">
+          <Switch
+            checked={filters.isLab}
+            onCheckedChange={(v) =>
+              setFilters({ ...filters, isLab: v })
+            }
+          />
+          <Label>Lab subject</Label>
+        </div>
+
+        {/* Clear Button */}
+        <Button
+          variant="outline"
+          className="mt-3"
+          onClick={() =>
+            setFilters({
+              name: "",
+              department: "",
+              semester: "",
+              year: "",
+              isLab: false,
+            })
+          }
+        >
+          Clear Filters
+        </Button>
+      </div>
       {/* LIST */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {subjects.map((s) => (
+        {filteredSubjects.map((s) => (
           <div key={s.id} className="card-hover p-4 flex justify-between">
             <div className="flex gap-3">
               <BookOpen />
