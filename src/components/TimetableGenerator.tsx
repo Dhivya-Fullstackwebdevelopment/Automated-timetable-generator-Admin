@@ -1,38 +1,132 @@
-import { useState, useRef } from "react";
-import { useAppState } from "@/context/AppContext";
+import { useState, useRef, useEffect } from "react";
 import type { Semester, Timetable } from "@/types/timetable";
-import { DAYS, PERIODS } from "@/types/timetable";
 import { Calendar, Download, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { generateTimetableApi } from "@/api/timetableApi";
+import { getDepartments } from "@/api/departmentApi";
+
+// ✅ Define proper types
+interface TimetablePeriod {
+  subject: string;
+  staff: string;
+}
+
+interface TimetableDayData {
+  day: string;
+  periods: TimetablePeriod[];
+}
+
+interface TimetableEntry {
+  id: number;
+  departmentId: string;
+  semester: string;
+  year: string;
+  classLevel: string;
+  generatedAt: number;
+  data: TimetableDayData[];
+}
+
+interface CurrentTT {
+  semester: string;
+  year: string;
+  classLevel: string;
+  generatedAt: number;
+  rows: TimetableDayData[];
+}
 
 export function TimetableGenerator() {
-  const { departments, timetables, generateTimetable, deleteTimetable } = useAppState();
+  const [departments, setDepartments] = useState<any[]>([]);
   const [departmentId, setDepartmentId] = useState("");
   const [semester, setSemester] = useState<Semester | "">("");
   const [year, setYear] = useState("");
   const [classLevel, setClassLevel] = useState("");
-  const [currentTT, setCurrentTT] = useState<Timetable | null>(null);
+  const [currentTT, setCurrentTT] = useState<CurrentTT | null>(null); // ✅ null by default
   const tableRef = useRef<HTMLDivElement>(null);
+  const [timetables, setTimetables] = useState<TimetableEntry[]>([]);
 
-  const selectedDept = departments.find(d => d.id === departmentId);
+  const selectedDept = departments.find((d) => String(d.id) === departmentId);
 
-  const handleGenerate = () => {
-    if (!departmentId) return;
-    const tt = generateTimetable({
-      departmentId,
-      semester: semester as Semester || undefined,
-      year: year ? parseInt(year) : undefined,
-      classLevel: classLevel || undefined,
-    });
-    setCurrentTT(tt);
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
+
+  const fetchDepartments = async () => {
+    const res = await getDepartments();
+    setDepartments(res.data.data);
+  };
+
+  const handleGenerate = async () => {
+    const isSchool = selectedDept?.type === 1;
+
+    if (!departmentId) {
+      alert("Please select a department");
+      return;
+    }
+
+    if (!isSchool && (!year || !semester)) {
+      alert("Please select semester and year");
+      return;
+    }
+
+    if (isSchool && !classLevel) {
+      alert("Please select a class");
+      return;
+    }
+
+    try {
+      const res = await generateTimetableApi({
+        department: Number(departmentId),
+        year: Number(year),
+        semester: semester.toUpperCase(),
+      });
+
+      const apiData: TimetableDayData[] = res.data.data;
+      const generatedAt = Date.now();
+
+      const newCurrentTT: CurrentTT = {
+        semester,
+        year,
+        classLevel,
+        generatedAt,
+        rows: apiData,
+      };
+
+      setCurrentTT(newCurrentTT);
+
+      // ✅ Save to history
+      setTimetables((prev) => [
+        ...prev,
+        {
+          id: generatedAt,
+          departmentId,
+          semester,
+          year,
+          classLevel,
+          generatedAt,
+          data: apiData,
+        },
+      ]);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate timetable ❌");
+    }
   };
 
   const handleDownload = async () => {
     if (!tableRef.current) return;
-    const canvas = await html2canvas(tableRef.current, { scale: 2, backgroundColor: "#ffffff" });
+    const canvas = await html2canvas(tableRef.current, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+    });
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF("landscape", "mm", "a4");
     const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -43,38 +137,63 @@ export function TimetableGenerator() {
     pdf.save(`${deptName}_Timetable.pdf`);
   };
 
-  const viewTT = (tt: Timetable) => setCurrentTT(tt);
+  const viewTT = (tt: TimetableEntry) => {
+    setCurrentTT({
+      semester: tt.semester,
+      year: tt.year,
+      classLevel: tt.classLevel,
+      generatedAt: tt.generatedAt,
+      rows: tt.data,
+    });
+  };
+
+  const deleteTimetable = (id: number) => {
+    setTimetables((prev) => prev.filter((tt) => tt.id !== id));
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold font-display">Timetable Generator</h2>
-        <p className="text-muted-foreground mt-1">Generate conflict-free schedules automatically</p>
+        <p className="text-muted-foreground mt-1">
+          Generate conflict-free schedules automatically
+        </p>
       </div>
 
       <div className="card-elevated p-6">
-        <h3 className="font-semibold font-display mb-4">Generate New Timetable</h3>
+        <h3 className="font-semibold font-display mb-4">
+          Generate New Timetable
+        </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Select value={departmentId} onValueChange={v => { setDepartmentId(v); setSemester(""); setYear(""); setClassLevel(""); }}>
-            <SelectTrigger><SelectValue placeholder="Select Department" /></SelectTrigger>
+          <Select value={departmentId} onValueChange={(v) => setDepartmentId(v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Department" />
+            </SelectTrigger>
             <SelectContent>
-              {departments.map(d => (
-                <SelectItem key={d.id} value={d.id}>{d.name} ({d.type})</SelectItem>
+              {departments.map((d) => (
+                <SelectItem key={d.id} value={String(d.id)}>
+                  {d.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {selectedDept?.type === "College" && (
+          {selectedDept?.type === 2 && (
             <>
-              <Select value={semester} onValueChange={v => setSemester(v as Semester)}>
-                <SelectTrigger><SelectValue placeholder="Semester" /></SelectTrigger>
+              <Select value={semester} onValueChange={(v) => setSemester(v as Semester)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semester" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Odd">Odd Semester</SelectItem>
                   <SelectItem value="Even">Even Semester</SelectItem>
                 </SelectContent>
               </Select>
+
               <Select value={year} onValueChange={setYear}>
-                <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">1st Year</SelectItem>
                   <SelectItem value="2">2nd Year</SelectItem>
@@ -85,21 +204,27 @@ export function TimetableGenerator() {
             </>
           )}
 
-          {selectedDept?.type === "School" && (
+          {selectedDept?.type === 1 && (
             <Select value={classLevel} onValueChange={setClassLevel}>
-              <SelectTrigger><SelectValue placeholder="Class" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Class" />
+              </SelectTrigger>
               <SelectContent>
                 {Array.from({ length: 12 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>Class {i + 1}</SelectItem>
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    Class {i + 1}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
         </div>
+
         <div className="flex gap-3 mt-4">
           <Button onClick={handleGenerate} disabled={!departmentId}>
             <Calendar className="w-4 h-4 mr-1" /> Generate Timetable
           </Button>
+
           {currentTT && (
             <>
               <Button variant="outline" onClick={handleGenerate}>
@@ -113,6 +238,7 @@ export function TimetableGenerator() {
         </div>
       </div>
 
+      {/* ✅ Table - now uses currentTT.rows */}
       {currentTT && (
         <div className="card-elevated p-6 overflow-x-auto" ref={tableRef}>
           <div className="mb-4">
@@ -126,33 +252,41 @@ export function TimetableGenerator() {
               Generated: {new Date(currentTT.generatedAt).toLocaleString()}
             </p>
           </div>
+
           <table className="w-full border-collapse min-w-[900px]">
             <thead>
               <tr>
-                <th className="timetable-header rounded-tl-lg">Day / Period</th>
-                {PERIODS.map(p => (
-                  <th key={p} className={`timetable-header ${p === 8 ? 'rounded-tr-lg' : ''}`}>
-                    Period {p}
+                <th className="timetable-header">Day / Period</th>
+                {[
+                  "09:00 AM - 09:50 AM",
+                  "09:50 AM - 10:40 AM",
+                  "10:50 AM - 11:40 AM",
+                  "11:40 AM - 12:30 PM",
+                  "01:20 PM - 02:10 PM",
+                  "02:10 PM - 03:00 PM",
+                  "03:10 PM - 04:00 PM",
+                  "04:00 PM - 04:50 PM",
+                ].map((time, i) => (
+                  <th key={i} className="timetable-header">
+                    Period {i + 1}
+                    <div className="text-xs text-white">{time}</div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {DAYS.map((day, di) => (
-                <tr key={day}>
-                  <td className={`timetable-day ${di === DAYS.length - 1 ? 'rounded-bl-lg' : ''}`}>{day}</td>
-                  {PERIODS.map((_, pi) => {
-                    const cell = currentTT.grid[di]?.[pi];
-                    if (!cell || !cell.subject) {
-                      return <td key={pi} className="timetable-cell bg-muted/30">—</td>;
-                    }
-                    return (
-                      <td key={pi} className={`timetable-cell ${cell.isLab ? 'bg-accent/10' : ''}`}>
-                        <div className="font-semibold text-xs">{cell.subject}</div>
-                        <div className="text-xs text-muted-foreground">{cell.staff}</div>
-                      </td>
-                    );
-                  })}
+              {/* ✅ Iterate over currentTT.rows instead of currentTT directly */}
+              {currentTT.rows.map((dayData, di) => (
+                <tr key={dayData.day}>
+                  <td className="timetable-day">{dayData.day}</td>
+                  {dayData.periods.map((p, pi) => (
+                    <td key={pi} className="timetable-cell">
+                      <div className="font-semibold text-xs">{p.subject}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.staff}
+                      </div>
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -160,14 +294,23 @@ export function TimetableGenerator() {
         </div>
       )}
 
+      {/* History */}
       {timetables.length > 0 && (
         <div>
-          <h3 className="font-semibold font-display mb-3">Generated Timetables History</h3>
+          <h3 className="font-semibold font-display mb-3">
+            Generated Timetables History
+          </h3>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {timetables.map(tt => {
-              const dept = departments.find(d => d.id === tt.departmentId);
+            {timetables.map((tt) => {
+              const dept = departments.find(
+                (d) => String(d.id) === tt.departmentId
+              );
               return (
-                <div key={tt.id} className="card-hover p-3 flex items-center justify-between cursor-pointer" onClick={() => viewTT(tt)}>
+                <div
+                  key={tt.id}
+                  className="card-hover p-3 flex items-center justify-between cursor-pointer"
+                  onClick={() => viewTT(tt)}
+                >
                   <div>
                     <p className="font-semibold text-sm">{dept?.name}</p>
                     <p className="text-xs text-muted-foreground">
@@ -177,7 +320,14 @@ export function TimetableGenerator() {
                       {new Date(tt.generatedAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); deleteTimetable(tt.id); }}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteTimetable(tt.id);
+                    }}
+                  >
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>

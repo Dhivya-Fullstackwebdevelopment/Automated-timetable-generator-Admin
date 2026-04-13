@@ -1,3 +1,5 @@
+import { JSX } from "react/jsx-runtime";
+
 export type InstitutionType = "School" | "College";
 
 export type StaffStatus = "Active" | "Sick Leave" | "Emergency Leave" | "Resigned";
@@ -41,6 +43,7 @@ export interface TimetableCell {
 export type TimetableRow = TimetableCell[];
 
 export interface Timetable {
+  map(arg0: (dayData: any, di: number) => JSX.Element): import("react").ReactNode;
   id: string;
   departmentId: string;
   semester?: Semester;
