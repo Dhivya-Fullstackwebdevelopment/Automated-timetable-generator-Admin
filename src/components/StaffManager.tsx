@@ -40,7 +40,7 @@ const staffSchema = z.object({
     name: z.string().min(2, "Name is required"),
     department: z.number(),
     subjects: z.string().min(2, "Subjects is required"),
-    status: z.enum(["ACTIVE", "SICK", "RESIGNED"]),
+    status: z.enum(["ACTIVE", "SICK", "RESIGNED","EMERGENCY"]),
 });
 
 export function StaffManager() {
