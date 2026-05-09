@@ -53,8 +53,10 @@ export function TimetableGenerator() {
   const [currentTT, setCurrentTT] = useState<CurrentTT | null>(null); // ✅ null by default
   const tableRef = useRef<HTMLDivElement>(null);
   const [timetables, setTimetables] = useState<TimetableEntry[]>([]);
-
   const selectedDept = departments.find((d) => String(d.id) === departmentId);
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [regenerateLoading, setRegenerateLoading] = useState(false);
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -65,7 +67,7 @@ export function TimetableGenerator() {
     setDepartments(res.data.data);
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (isRegenerate = false) => {
     const isSchool = selectedDept?.type === 1;
 
     if (!departmentId) {
@@ -79,6 +81,11 @@ export function TimetableGenerator() {
     }
 
     try {
+      if (isRegenerate) {
+        setRegenerateLoading(true);
+      } else {
+        setGenerateLoading(true);
+      }
       let payload: any = {
         type: selectedDept?.type,
         department: Number(departmentId),
@@ -129,23 +136,44 @@ export function TimetableGenerator() {
         "Failed to generate timetable ❌";
 
       toast.error(apiMessage);
+    } finally {
+      if (isRegenerate) {
+        setRegenerateLoading(false);
+      } else {
+        setGenerateLoading(false);
+      }
     }
   };
 
   const handleDownload = async () => {
     if (!tableRef.current) return;
-    const canvas = await html2canvas(tableRef.current, {
-      scale: 2,
-      backgroundColor: "#ffffff",
-    });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("landscape", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
 
-    const deptName = selectedDept?.name || "Timetable";
-    pdf.save(`${deptName}_Timetable.pdf`);
+    try {
+      setDownloadLoading(true);
+
+      const canvas = await html2canvas(tableRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("landscape", "mm", "a4");
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
+
+      const deptName = selectedDept?.name || "Timetable";
+
+      pdf.save(`${deptName}_Timetable.pdf`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to download PDF");
+    } finally {
+      setDownloadLoading(false);
+    }
   };
 
   const viewTT = (tt: TimetableEntry) => {
@@ -215,21 +243,55 @@ export function TimetableGenerator() {
             </>
           )}
 
-         
+
         </div>
 
         <div className="flex gap-3 mt-4">
-          <Button onClick={handleGenerate} disabled={!departmentId}>
-            <Calendar className="w-4 h-4 mr-1" /> Generate Timetable
+          <Button
+            onClick={() => handleGenerate(false)}
+            disabled={!departmentId || generateLoading}
+          >
+            {generateLoading  ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Calendar className="w-4 h-4 mr-1" />
+                Generate Timetable
+              </>
+            )}
           </Button>
 
           {currentTT && (
             <>
-              <Button variant="outline" onClick={handleGenerate}>
-                <RefreshCw className="w-4 h-4 mr-1" /> Regenerate
+              <Button
+                variant="outline"
+                onClick={() => handleGenerate(false)}
+                disabled={regenerateLoading }
+              >
+                <RefreshCw
+                  className={`w-4 h-4 mr-1 ${regenerateLoading  ? "animate-spin" : ""}`}
+                />
+                Regenerate
               </Button>
-              <Button variant="outline" onClick={handleDownload}>
-                <Download className="w-4 h-4 mr-1" /> Download PDF
+              <Button
+                variant="outline"
+                onClick={handleDownload}
+                disabled={downloadLoading}
+              >
+                {downloadLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-1" />
+                    Download PDF
+                  </>
+                )}
               </Button>
             </>
           )}
