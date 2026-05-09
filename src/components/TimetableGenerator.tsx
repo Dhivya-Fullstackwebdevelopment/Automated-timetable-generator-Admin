@@ -215,20 +215,7 @@ export function TimetableGenerator() {
             </>
           )}
 
-          {selectedDept?.type === 1 && (
-            <Select value={classLevel} onValueChange={setClassLevel}>
-              <SelectTrigger>
-                <SelectValue placeholder="Class" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>
-                    Class {i + 1}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+         
         </div>
 
         <div className="flex gap-3 mt-4">
