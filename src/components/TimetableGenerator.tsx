@@ -13,6 +13,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { generateTimetableApi } from "@/api/timetableApi";
 import { getDepartments } from "@/api/departmentApi";
+import { toast } from "sonner";
 
 // ✅ Define proper types
 interface TimetablePeriod {
@@ -68,26 +69,32 @@ export function TimetableGenerator() {
     const isSchool = selectedDept?.type === 1;
 
     if (!departmentId) {
-      alert("Please select a department");
+      toast.error("Please select a department");
       return;
     }
 
     if (!isSchool && (!year || !semester)) {
-      alert("Please select semester and year");
-      return;
-    }
-
-    if (isSchool && !classLevel) {
-      alert("Please select a class");
+      toast.error("Please select semester and year");
       return;
     }
 
     try {
-      const res = await generateTimetableApi({
+      let payload: any = {
+        type: selectedDept?.type,
         department: Number(departmentId),
-        year: Number(year),
-        semester: semester.toUpperCase(),
-      });
+      };
+
+      if (selectedDept?.type === 2) {
+        payload.year = Number(year);
+        payload.semester = semester.toUpperCase();
+      }
+
+      const res = await generateTimetableApi(payload);
+
+      if (!res.data.status) {
+        toast.error(res.data.message || "Something went wrong");
+        return;
+      }
 
       const apiData: TimetableDayData[] = res.data.data;
       const generatedAt = Date.now();
@@ -102,7 +109,6 @@ export function TimetableGenerator() {
 
       setCurrentTT(newCurrentTT);
 
-      // ✅ Save to history
       setTimetables((prev) => [
         ...prev,
         {
@@ -115,9 +121,14 @@ export function TimetableGenerator() {
           data: apiData,
         },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to generate timetable ❌");
+
+      const apiMessage =
+        error?.response?.data?.message ||
+        "Failed to generate timetable ❌";
+
+      toast.error(apiMessage);
     }
   };
 
