@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   GraduationCap,
+  LogOut,
 } from "lucide-react";
 
 type Page = "dashboard" | "departments" | "staff" | "subjects" | "timetable";
@@ -88,7 +89,19 @@ function AppContent() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-sidebar-border space-y-3">
+          <button
+            onClick={() => {
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.href = "/login";
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </button>
+
           <p className="text-[10px] text-sidebar-foreground/40 text-center">
             © 2026 Timetable System
           </p>
