@@ -16,6 +16,7 @@ import {
   GraduationCap,
   LogOut,
 } from "lucide-react";
+import logo from "../assests/logo.png";
 
 type Page = "dashboard" | "departments" | "staff" | "subjects" | "timetable";
 
@@ -55,8 +56,13 @@ function AppContent() {
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
         <div className="p-5 flex items-center gap-3 border-b border-sidebar-border">
-          <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <GraduationCap className="w-5 h-5 text-sidebar-primary-foreground" />
+          {/* Logo */}
+          <div className="w-11 h-11 rounded-xl bg-white shadow-md flex items-center justify-center overflow-hidden p-1">
+            <img
+              src={logo}
+              alt="Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <h1 className="font-bold font-display text-sidebar-foreground text-sm">TimeTable</h1>
@@ -103,7 +109,7 @@ function AppContent() {
           </button>
 
           <p className="text-[10px] text-sidebar-foreground/40 text-center">
-            © 2026 Timetable System
+            © {new Date().getFullYear()} Timetable System
           </p>
         </div>
       </aside>
