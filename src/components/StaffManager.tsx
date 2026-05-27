@@ -30,6 +30,7 @@ type Dept = {
 type Staff = {
     id: number;
     name: string;
+    email: string;
     subjects: string;
     status: string;
     department: number;
@@ -38,9 +39,10 @@ type Staff = {
 
 const staffSchema = z.object({
     name: z.string().min(2, "Name is required"),
+    email: z.string().email("Valid email is required"),
     department: z.number(),
     subjects: z.string().min(2, "Subjects is required"),
-    status: z.enum(["ACTIVE", "SICK", "RESIGNED","EMERGENCY"]),
+    status: z.enum(["ACTIVE", "SICK", "RESIGNED", "EMERGENCY"]),
 });
 
 export function StaffManager() {
@@ -53,7 +55,7 @@ export function StaffManager() {
     const [editId, setEditId] = useState<number | null>(null);
     const [deleteId, setDeleteId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState<{ name?: string; subjects?: string }>({});
+    const [errors, setErrors] = useState<{ name?: string; email?: string; subjects?: string; }>({});
     const [filters, setFilters] = useState({
         name: "",
         department: "",
@@ -64,6 +66,7 @@ export function StaffManager() {
     const formRef = useRef<HTMLDivElement | null>(null);
     const [subjects, setSubjects] = useState<any[]>([]);
     const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+    const [email, setEmail] = useState("");
 
     const filteredStaff = staff.filter((s) => {
         return (
@@ -90,6 +93,7 @@ export function StaffManager() {
         setStatus("ACTIVE");
         setEditId(null);
         setDepartmentId("3");
+        setEmail("");
         setErrors({});
     };
 
@@ -125,6 +129,7 @@ export function StaffManager() {
     const handleSubmit = async () => {
         const payload = {
             name,
+            email,
             department: Number(departmentId),
             subjects: selectedSubjects.join(", "),
             status,
@@ -136,6 +141,7 @@ export function StaffManager() {
             const err = result.error.flatten().fieldErrors;
             setErrors({
                 name: err.name?.[0],
+                email: err.email?.[0],
                 subjects: err.subjects?.[0],
             });
             toast.error(err.name?.[0] || "Validation error ❌");
@@ -164,6 +170,7 @@ export function StaffManager() {
 
     const handleEdit = (s: Staff) => {
         setName(s.name);
+        setEmail(s.email);
         setDepartmentId(String(s.department));
         setSelectedSubjects(s.subjects.split(",").map((x) => x.trim()));
         setStatus(s.status);
@@ -196,7 +203,6 @@ export function StaffManager() {
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold">Staff Management</h2>
-
             {/* FORM */}
             <div ref={formRef} className="card-elevated p-6">
                 <h3 className="font-semibold mb-4">
@@ -267,6 +273,26 @@ export function StaffManager() {
                                 </span>
                             ))}
                         </div>
+                    </div>
+
+                    <div>
+                        <Input
+                            placeholder="Email"
+                            value={email}
+                            onChange={(e) => {
+                                setEmail(e.target.value);
+                                setErrors((prev) => ({
+                                    ...prev,
+                                    email: undefined,
+                                }));
+                            }}
+                        />
+
+                        {errors.email && (
+                            <p className="text-red-500 text-sm">
+                                {errors.email}
+                            </p>
+                        )}
                     </div>
 
                     {/* STATUS */}
@@ -426,6 +452,9 @@ export function StaffManager() {
                                     <p className="font-semibold">{s.name}</p>
                                     <p className="text-sm text-muted-foreground">
                                         {s.department_name}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {s.email || "N/A"}
                                     </p>
                                 </div>
                             </div>
