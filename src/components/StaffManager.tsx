@@ -127,9 +127,13 @@ export function StaffManager() {
     }, []);
 
     const handleSubmit = async () => {
+        const autoPassword =
+            name.replace(/\s+/g, "") + "@123";
+
         const payload = {
             name,
             email,
+            password: autoPassword,
             department: Number(departmentId),
             subjects: selectedSubjects.join(", "),
             status,
