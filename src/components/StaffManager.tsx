@@ -32,6 +32,7 @@ type Staff = {
     name: string;
     email: string;
     subjects: string;
+    password: string;
     status: string;
     department: number;
     department_name: string;
@@ -483,7 +484,16 @@ export function StaffManager() {
                         </div>
 
                         <div className="mt-2 text-sm">
-                            <strong>Subjects:</strong> {s.subjects}
+                            <p>
+                                <strong>Subjects:</strong> {s.subjects}
+                            </p>
+
+                            <p className="mt-1">
+                                <strong>Password:</strong>
+                                <span className="ml-1 text-blue-600 font-medium">
+                                    {s.password}
+                                </span>
+                            </p>
                         </div>
 
                         <div className="mt-2">
